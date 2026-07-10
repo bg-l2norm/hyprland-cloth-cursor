@@ -1,12 +1,8 @@
 # Hyprland Cloth Cursor
 
-
+A native C++ plugin for Hyprland that gives the visible cursor inertial drag, rotation, bend, stretch, and click compression.
 
 https://github.com/user-attachments/assets/21f9e71b-1e15-45f2-aabc-06c6c4872f2d
-
-
-
-A native C++ plugin for Hyprland that gives the visible cursor inertial drag, rotation, bend, stretch, and click compression.
 
 The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds a small Lua startup entry that loads and enables the plugin after login.
 
@@ -33,6 +29,9 @@ The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds 
 During fast motion, the visible cursor trails the pointer. Clicks still use the real pointer position.
 
 ## How it works
+
+<img width="1448" height="1086" alt="b81d1ca1-71b3-457d-9041-46d140093651" src="https://github.com/user-attachments/assets/97a37453-1910-4459-9811-d8ca209598cd" />
+
 
 ```text
 Hyprland pointer position
