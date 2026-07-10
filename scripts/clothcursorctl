@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LIB_PATH="${CLOTHCURSOR_LIB:-$HOME/.local/lib/hyprland-cloth-cursor/libclothcursor.so}"
+PLUGIN_NAME="clothcursor"
+
+log() { printf '[clothcursor] %s\n' "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+hyprctl_current() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl -i "$HYPRLAND_INSTANCE_SIGNATURE" "$@"
+  else
+    hyprctl "$@"
+  fi
+}
+
+have_hyprland() {
+  command -v hyprctl >/dev/null 2>&1 && hyprctl_current -j plugin list >/dev/null 2>&1
+}
+
+plugin_loaded() {
+  hyprctl_current -j plugin list 2>/dev/null | python3 -c '
+import json, sys
+try:
+    plugins = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if any(p.get("name") == "clothcursor" for p in plugins) else 1)
+'
+}
+
+current_hyprland_pid() {
+  local signature="${HYPRLAND_INSTANCE_SIGNATURE:-}"
+  hyprctl -j instances 2>/dev/null | python3 -c '
+import json, os, sys
+try:
+    instances = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+matching = [i for i in instances if i.get("instance") == sig] if sig else []
+if len(matching) == 1:
+    print(matching[0]["pid"])
+elif not sig and len(instances) == 1:
+    print(instances[0]["pid"])
+else:
+    raise SystemExit(1)
+'
+}
+
+mapped_plugin_paths() {
+  local pid path
+  pid="$(current_hyprland_pid 2>/dev/null || true)"
+  [[ -n "$pid" && -r "/proc/$pid/maps" ]] || return 0
+  while IFS= read -r path; do
+    [[ "$path" == */libclothcursor.so ]] && printf '%s\n' "$path"
+  done < <(sed -n 's|^.* /|/|p' "/proc/$pid/maps" | sort -u)
+}
+
+load_plugin() {
+  [[ -f "$LIB_PATH" ]] || die "plugin library not installed: $LIB_PATH"
+  if plugin_loaded; then
+    return 0
+  fi
+  hyprctl_current plugin load "$LIB_PATH" >/dev/null || die "Hyprland rejected the plugin (check exact-version compatibility)"
+  plugin_loaded || die "Hyprland reported success but clothcursor is not listed"
+}
+
+enable_plugin() {
+  load_plugin
+  hyprctl_current clothcursor enable >/dev/null || {
+    unload_plugin || true
+    die "plugin loaded but could not enable; stock cursor restored"
+  }
+  local status
+  status="$(hyprctl_current -j clothcursor status 2>/dev/null || true)"
+  python3 -c 'import json,sys; raise SystemExit(0 if json.loads(sys.argv[1]).get("enabled") is True else 1)' "$status" || {
+    unload_plugin || true
+    die "enable verification failed; stock cursor restored"
+  }
+}
+
+disable_plugin() {
+  plugin_loaded || return 0
+  hyprctl_current clothcursor disable >/dev/null || return 1
+}
+
+unload_plugin() {
+  plugin_loaded || return 0
+  disable_plugin || true
+
+  local -a paths=()
+  local path
+  while IFS= read -r path; do
+    [[ -n "$path" ]] && paths+=("$path")
+  done < <(mapped_plugin_paths)
+  ((${#paths[@]})) || paths=("$LIB_PATH")
+
+  for path in "${paths[@]}"; do
+    hyprctl_current plugin unload "$path" >/dev/null 2>&1 || true
+  done
+  if plugin_loaded; then
+    die "could not identify/unload the mapped clothcursor library"
+  fi
+}
+
+status_plugin() {
+  printf 'installed: %s\n' "$([[ -f "$LIB_PATH" ]] && echo yes || echo no)"
+  if ! have_hyprland; then
+    printf 'loaded: unavailable (no reachable Hyprland session)\n'
+    return 0
+  fi
+  if plugin_loaded; then
+    printf 'loaded: yes\n'
+    hyprctl_current -j clothcursor status
+  else
+    printf 'loaded: no\n'
+  fi
+}
+
+session_start() {
+  [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || die "HYPRLAND_INSTANCE_SIGNATURE is absent; refusing to choose an arbitrary compositor"
+  local attempt
+  for attempt in {1..40}; do
+    if have_hyprland; then
+      enable_plugin
+      log "enabled for this Hyprland session"
+      return 0
+    fi
+    sleep 0.25
+  done
+  die "Hyprland did not become reachable within 10 seconds"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: clothcursorctl COMMAND
+
+Commands:
+  enable         load (if needed) and enable the effect
+  disable        restore the stock cursor but keep the plugin loaded
+  toggle         toggle the effect (loads it first when absent)
+  unload         disable and unload the plugin
+  status         show install/load/runtime status
+  session-start  retry startup and enable (used by Hyprland autostart)
+EOF
+}
+
+command="${1:-status}"
+case "$command" in
+  enable) have_hyprland || die "no reachable Hyprland session"; enable_plugin ;;
+  disable) have_hyprland || die "no reachable Hyprland session"; disable_plugin ;;
+  toggle)
+    have_hyprland || die "no reachable Hyprland session"
+    if plugin_loaded; then
+      hyprctl_current clothcursor toggle
+    else
+      enable_plugin
+    fi
+    ;;
+  unload) have_hyprland || die "no reachable Hyprland session"; unload_plugin ;;
+  status) status_plugin ;;
+  session-start) session_start ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell syntax
+        run: bash -n install.sh scripts/clothcursorctl tests/installer_test.sh
+      - name: Configure portable physics core
+        run: cmake -S . -B build-core -DCMAKE_BUILD_TYPE=Release -DCLOTH_CURSOR_BUILD_PLUGIN=OFF
+      - name: Build
+        run: cmake --build build-core -j2
+      - name: Test
+        run: ctest --test-dir build-core --output-on-failure

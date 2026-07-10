@@ -1,0 +1,7 @@
+.deps/
+build/
+build-*/
+*.so
+*.o
+Testing/
+compile_commands.json
