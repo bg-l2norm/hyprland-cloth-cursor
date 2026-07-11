@@ -3,6 +3,7 @@
 #include <hyprland/src/plugins/PluginAPI.hpp>
 
 #include <memory>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -22,8 +23,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     const std::string clientAbi = __hyprland_api_get_client_hash();
     const auto version = HyprlandAPI::getHyprlandVersion(handle);
 
-    if (version.hash != kExpectedCommit || serverAbi != kExpectedAbi || clientAbi != kExpectedAbi || serverAbi != clientAbi)
-        throw std::runtime_error("[clothcursor] exact Hyprland ABI mismatch; refusing initialization");
+    if (serverAbi != clientAbi)
+        throw std::runtime_error("[clothcursor] runtime ABI differs from the headers used to build the plugin; refusing initialization");
+    if (version.hash != kExpectedCommit || serverAbi != kExpectedAbi)
+        std::cerr << "[clothcursor] WARN: running on an untested Hyprland build; guarded runtime checks remain enabled\n";
 
     runtime = std::make_unique<clothcursor::Runtime>(handle);
     runtime->start();

@@ -64,8 +64,26 @@ require_tools() {
 verify_installed_hyprland() {
   local version
   version="$(Hyprland --version 2>&1)" || die "could not query Hyprland version"
-  grep -Fq "Version ABI string: $EXPECTED_HYPRLAND_ABI" <<<"$version" ||
-    die "unsupported Hyprland ABI; expected $EXPECTED_HYPRLAND_ABI"
+  if grep -Fq "Version ABI string: $EXPECTED_HYPRLAND_ABI" <<<"$version"; then
+    log "verified tested Hyprland ABI"
+    return 0
+  fi
+
+  log "WARN: this Hyprland build has not been tested with Cloth Cursor."
+  log "Tested ABI: $EXPECTED_HYPRLAND_ABI"
+  printf '%s\n' "$version" | sed -n '/^Hyprland /p; /^Version ABI string:/p' >&2
+  log "The plugin will be compiled against your installed headers and will still refuse a runtime ABI mismatch."
+
+  if [[ "${CLOTHCURSOR_ALLOW_UNTESTED:-0}" == 1 ]]; then
+    log "continuing because CLOTHCURSOR_ALLOW_UNTESTED=1"
+    return 0
+  fi
+  if [[ -t 0 ]]; then
+    local answer
+    read -r -p "[installer] Continue with this untested Hyprland build? [y/N] " answer
+    [[ "$answer" == y || "$answer" == Y || "$answer" == yes || "$answer" == YES ]] && return 0
+  fi
+  die "installation cancelled; no files were changed (set CLOTHCURSOR_ALLOW_UNTESTED=1 for a non-interactive install)"
 }
 
 config_mode() {

@@ -7,6 +7,10 @@ endif()
 
 file(STRINGS "${HYPRLAND_VERSION_HEADER}" HYPRLAND_HASH_LINE REGEX "^#define GIT_COMMIT_HASH")
 if(NOT HYPRLAND_HASH_LINE MATCHES "\"${EXPECTED_HYPRLAND_COMMIT}\"")
-    message(FATAL_ERROR "Hyprland headers are not exact commit ${EXPECTED_HYPRLAND_COMMIT}: ${HYPRLAND_HASH_LINE}")
+    message(WARNING
+        "Cloth Cursor has only been tested with Hyprland commit ${EXPECTED_HYPRLAND_COMMIT}. "
+        "Building against the installed headers (${HYPRLAND_HASH_LINE}); runtime ABI and hook checks will still protect the compositor."
+    )
+else()
+    message(STATUS "Verified tested Hyprland header commit ${EXPECTED_HYPRLAND_COMMIT}")
 endif()
-message(STATUS "Verified exact Hyprland header commit ${EXPECTED_HYPRLAND_COMMIT}")

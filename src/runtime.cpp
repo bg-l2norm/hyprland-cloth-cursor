@@ -97,13 +97,13 @@ bool Runtime::installHook(std::string& error) noexcept {
     void* address = memberAddress(&CPointerManager::renderSoftwareCursorsFor);
     Dl_info info{};
     if (!address || !dladdr(address, &info) || !info.dli_sname || std::string_view{info.dli_sname} != kCursorRenderSymbol) {
-        error = "Hyprland 0.55.4 cursor-render symbol mismatch";
+        error = "Hyprland cursor-render symbol mismatch; effect was not enabled and the stock cursor remains active";
         return false;
     }
 
     m_cursorHook = HyprlandAPI::createFunctionHook(m_handle, address, reinterpret_cast<void*>(&Runtime::hookCursorRender));
     if (!m_cursorHook || !m_cursorHook->hook()) {
-        error = "failed to activate exact cursor-render hook";
+        error = "failed to activate cursor-render hook; effect was not enabled and the stock cursor remains active";
         removeHook();
         return false;
     }

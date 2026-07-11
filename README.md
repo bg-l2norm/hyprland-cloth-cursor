@@ -13,7 +13,7 @@ The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds 
 > a0136d8c04687bb36eb8a28eb9d1ff92aea99704_aq_0.12_hu_0.13_hg_0.5_hc_0.1_hlg_0.6
 > ```
 >
-> Hyprland plugins use private compositor APIs. CMake and plugin startup verify the exact ABI before loading. The current renderer path is OpenGL.
+> Hyprland plugins use private compositor APIs. Other versions are **untested**, but the installer can build against their installed headers after an explicit warning and confirmation. The plugin still refuses a build/runtime ABI mismatch, and it restores or retains the stock cursor if its guarded renderer-hook checks fail. The current renderer path is OpenGL.
 
 ## What it does
 
@@ -142,7 +142,7 @@ On Arch Linux, these come from packages such as `base-devel`, `cmake`, `hyprland
 
 The installer:
 
-1. verifies the installed Hyprland ABI and headers;
+1. checks the installed Hyprland ABI and warns before continuing on an untested build;
 2. builds `libclothcursor.so`;
 3. runs the physics tests;
 4. checks the shared library and its dependencies;
@@ -220,7 +220,7 @@ The uninstaller disables and unloads the plugin before deleting its installed li
 ## Safety and limitations
 
 - The plugin starts disabled after direct loading. `clothcursorctl enable` activates it.
-- The release accepts one exact Hyprland ABI.
+- Hyprland 0.55.4 at the commit above is the tested baseline. Other builds can be attempted after confirmation, but compatibility is not guaranteed.
 - The renderer path requires Hyprland's OpenGL renderer.
 - HDR/ICC and other renderer paths are outside this release.
 - Software cursor composition uses more power than a hardware cursor plane.

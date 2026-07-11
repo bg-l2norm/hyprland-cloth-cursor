@@ -63,7 +63,7 @@ load_plugin() {
   if plugin_loaded; then
     return 0
   fi
-  hyprctl_current plugin load "$LIB_PATH" >/dev/null || die "Hyprland rejected the plugin (check exact-version compatibility)"
+  hyprctl_current plugin load "$LIB_PATH" >/dev/null || die "Hyprland rejected the plugin; stock cursor remains active (check ABI compatibility and the Hyprland log)"
   plugin_loaded || die "Hyprland reported success but clothcursor is not listed"
 }
 
