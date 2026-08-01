@@ -11,7 +11,7 @@ jobs:
   portable-core:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check shell syntax
         run: bash -n install.sh scripts/clothcursorctl tests/installer_test.sh tests/nested_multi_output_test.sh
       - name: Configure portable physics core
