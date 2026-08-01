@@ -1,6 +1,7 @@
 #pragma once
 
 #include "physics.hpp"
+#include "hyprland_compat.hpp"
 
 #include <hyprland/src/SharedDefs.hpp>
 #include <hyprland/src/devices/IPointer.hpp>
@@ -13,8 +14,6 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-
-class CPointerManager;
 
 namespace clothcursor {
 
@@ -34,14 +33,14 @@ class Runtime {
 
   private:
     using Clock = std::chrono::steady_clock;
-    using CursorRenderFn = void (*)(CPointerManager*, PHLMONITOR, const Time::steady_tp&, CRegion&, std::optional<Vector2D>, bool);
+    using CursorRenderFn = void (*)(HyprPointerManager*, PHLMONITOR, const Time::steady_tp&, CRegion&, std::optional<Vector2D>, bool);
 
-    static void hookCursorRender(CPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
+    static void hookCursorRender(HyprPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
                                  std::optional<Vector2D> overridePos, bool forceRender);
 
     bool installHook(std::string& error) noexcept;
     void removeHook() noexcept;
-    [[nodiscard]] bool renderCursor(CPointerManager* pointers, PHLMONITOR monitor, const Time::steady_tp& now,
+    [[nodiscard]] bool renderCursor(HyprPointerManager* pointers, PHLMONITOR monitor, const Time::steady_tp& now,
                                     std::optional<Vector2D> overridePos, bool forceRender) noexcept;
     void onMouseMove(Vector2D position) noexcept;
     void onMouseButton(IPointer::SButtonEvent event) noexcept;
@@ -62,6 +61,8 @@ class Runtime {
     bool m_haveBounds = false;
     bool m_softwareLocked = false;
     std::uint64_t m_cursorHookCalls = 0;
+    std::uint64_t m_ownerOutputHookCalls = 0;
+    std::uint64_t m_nonOwnerOutputHookCalls = 0;
     std::uint64_t m_passesQueued = 0;
     std::uint64_t m_renderRejects = 0;
     std::uint64_t m_fallbackCalls = 0;

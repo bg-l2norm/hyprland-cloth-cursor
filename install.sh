@@ -15,7 +15,10 @@ MARK_START="-- BEGIN hyprland-cloth-cursor (managed by installer)"
 MARK_END="-- END hyprland-cloth-cursor (managed by installer)"
 CONF_MARK_START="# BEGIN hyprland-cloth-cursor (managed by installer)"
 CONF_MARK_END="# END hyprland-cloth-cursor (managed by installer)"
-EXPECTED_HYPRLAND_ABI="a0136d8c04687bb36eb8a28eb9d1ff92aea99704_aq_0.12_hu_0.13_hg_0.5_hc_0.1_hlg_0.6"
+TESTED_HYPRLAND_ABIS=(
+  "a0136d8c04687bb36eb8a28eb9d1ff92aea99704_aq_0.12_hu_0.13_hg_0.5_hc_0.1_hlg_0.6"
+  "5c9377c15f85c50648f35ca5a213754f95b93ca0_aq_0.14_hu_0.14_hg_0.5_hc_0.1_hlg_0.6"
+)
 
 log() { printf '[installer] %s\n' "$*"; }
 die() { log "ERROR: $*" >&2; exit 1; }
@@ -64,13 +67,19 @@ require_tools() {
 verify_installed_hyprland() {
   local version
   version="$(Hyprland --version 2>&1)" || die "could not query Hyprland version"
-  if grep -Fq "Version ABI string: $EXPECTED_HYPRLAND_ABI" <<<"$version"; then
-    log "verified tested Hyprland ABI"
-    return 0
-  fi
+  local tested_abi
+  for tested_abi in "${TESTED_HYPRLAND_ABIS[@]}"; do
+    if grep -Fq "Version ABI string: $tested_abi" <<<"$version"; then
+      log "verified tested Hyprland ABI: $tested_abi"
+      return 0
+    fi
+  done
 
   log "WARN: this Hyprland build has not been tested with Cloth Cursor."
-  log "Tested ABI: $EXPECTED_HYPRLAND_ABI"
+  log "Tested ABIs:"
+  for tested_abi in "${TESTED_HYPRLAND_ABIS[@]}"; do
+    log "  $tested_abi"
+  done
   printf '%s\n' "$version" | sed -n '/^Hyprland /p; /^Version ABI string:/p' >&2
   log "The plugin will be compiled against your installed headers and will still refuse a runtime ABI mismatch."
 

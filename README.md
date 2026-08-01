@@ -7,10 +7,11 @@ https://github.com/user-attachments/assets/21f9e71b-1e15-45f2-aabc-06c6c4872f2d
 The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds a small Lua startup entry that loads and enables the plugin after login.
 
 > [!IMPORTANT]
-> This release targets Hyprland 0.55.4 commit `a0136d8c04687bb36eb8a28eb9d1ff92aea99704` and ABI:
+> This release is live-tested against these exact Hyprland builds:
 >
 > ```text
-> a0136d8c04687bb36eb8a28eb9d1ff92aea99704_aq_0.12_hu_0.13_hg_0.5_hc_0.1_hlg_0.6
+> 0.55.4  a0136d8c04687bb36eb8a28eb9d1ff92aea99704_aq_0.12_hu_0.13_hg_0.5_hc_0.1_hlg_0.6
+> 0.56.1  5c9377c15f85c50648f35ca5a213754f95b93ca0_aq_0.14_hu_0.14_hg_0.5_hc_0.1_hlg_0.6
 > ```
 >
 > Hyprland plugins use private compositor APIs. Other versions are **untested**, but the installer can build against their installed headers after an explicit warning and confirmation. The plugin still refuses a build/runtime ABI mismatch, and it restores or retains the stock cursor if its guarded renderer-hook checks fail. The current renderer path is OpenGL.
@@ -109,9 +110,11 @@ The plugin calculates a conservative bounding box from all four transformed curs
 |---|---|
 | `src/plugin.cpp` | Plugin entrypoint and runtime ABI verification |
 | `src/runtime.cpp` | Hyprland hooks, input listeners, frame scheduling, controls, fallback handling |
+| `src/hyprland_compat.hpp` | Compatibility bridge for Hyprland 0.55 and 0.56 pointer/monitor APIs |
 | `src/physics.cpp` | Spring simulation, visual transform, hotspot anchoring, transformed bounds |
 | `src/cursor_pass.cpp` | Hyprland render-pass element and texture transform |
 | `tests/physics_test.cpp` | Physics and geometry tests |
+| `tests/nested_multi_output_test.sh` | Isolated bidirectional two-output render/scheduling gate |
 | `scripts/clothcursorctl` | Load, enable, disable, status, and unload commands |
 | `install.sh` | Local build, tests, installation, startup entry, rollback |
 | `cmake/VerifyHyprland.cmake` | Build-time Hyprland ABI check |
@@ -220,7 +223,7 @@ The uninstaller disables and unloads the plugin before deleting its installed li
 ## Safety and limitations
 
 - The plugin starts disabled after direct loading. `clothcursorctl enable` activates it.
-- Hyprland 0.55.4 at the commit above is the tested baseline. Other builds can be attempted after confirmation, but compatibility is not guaranteed.
+- Hyprland 0.55.4 and 0.56.1 at the exact commits above are tested baselines. Other builds can be attempted after confirmation, but compatibility is not guaranteed.
 - The renderer path requires Hyprland's OpenGL renderer.
 - HDR/ICC and other renderer paths are outside this release.
 - Software cursor composition uses more power than a hardware cursor plane.
@@ -267,6 +270,14 @@ cmake -S . -B build-sanitize \
 cmake --build build-sanitize
 ctest --test-dir build-sanitize --output-on-failure
 ```
+
+With a parent Hyprland session running, execute the isolated two-output compositor gate:
+
+```bash
+./tests/nested_multi_output_test.sh
+```
+
+It starts a temporary nested Hyprland, creates an adjacent headless output, verifies A→B and B→A spring settlement and owner-output scheduling, requires zero render rejects/fallbacks, then unloads the plugin and stops the nested compositor.
 
 ## License
 

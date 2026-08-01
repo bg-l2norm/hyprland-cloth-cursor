@@ -4,7 +4,6 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/event/EventBus.hpp>
-#include <hyprland/src/managers/PointerManager.hpp>
 #include <hyprland/src/render/Renderer.hpp>
 
 #include <algorithm>
@@ -20,8 +19,13 @@
 namespace clothcursor {
 namespace {
 constexpr double kDamagePadding = 3.0;
+#if CLOTHCURSOR_NAMESPACED_POINTER_MANAGER
+constexpr std::string_view kCursorRenderSymbol =
+    "_ZN7Pointer15CPointerManager24renderSoftwareCursorsForEN9Hyprutils6Memory14CSharedPointerIN7Monitor8CMonitorEEERKNSt6chrono10time_pointINS7_3_V212steady_clockENS7_8durationIlSt5ratioILl1ELl1000000000EEEEEERNS1_4Math7CRegionESt8optionalINSI_8Vector2DEEb";
+#else
 constexpr std::string_view kCursorRenderSymbol =
     "_ZN15CPointerManager24renderSoftwareCursorsForEN9Hyprutils6Memory14CSharedPointerI8CMonitorEERKNSt6chrono10time_pointINS5_3_V212steady_clockENS5_8durationIlSt5ratioILl1ELl1000000000EEEEEERNS0_4Math7CRegionESt8optionalINSG_8Vector2DEEb";
+#endif
 
 std::string_view actionFrom(const std::string& request) {
     const auto first = request.find_first_not_of(" \t");
@@ -94,10 +98,15 @@ void Runtime::start() {
 }
 
 bool Runtime::installHook(std::string& error) noexcept {
-    void* address = memberAddress(&CPointerManager::renderSoftwareCursorsFor);
+    void* address = memberAddress(&HyprPointerManager::renderSoftwareCursorsFor);
     Dl_info info{};
-    if (!address || !dladdr(address, &info) || !info.dli_sname || std::string_view{info.dli_sname} != kCursorRenderSymbol) {
-        error = "Hyprland cursor-render symbol mismatch; effect was not enabled and the stock cursor remains active";
+    if (!address || !dladdr(address, &info) || !info.dli_sname) {
+        error = "Hyprland cursor-render symbol could not be resolved; effect was not enabled and the stock cursor remains active";
+        return false;
+    }
+    if (std::string_view{info.dli_sname} != kCursorRenderSymbol) {
+        error = "Hyprland cursor-render symbol mismatch (resolved: " + std::string{info.dli_sname} +
+            "); effect was not enabled and the stock cursor remains active";
         return false;
     }
 
@@ -120,7 +129,7 @@ void Runtime::removeHook() noexcept {
 bool Runtime::enable(std::string& error) noexcept {
     if (m_enabled)
         return true;
-    if (!g_pHyprRenderer || !g_pPointerManager || !g_pCompositor) {
+    if (!g_pHyprRenderer || !pointerManager() || !g_pCompositor) {
         error = "Hyprland cursor/render state unavailable";
         return false;
     }
@@ -130,7 +139,7 @@ bool Runtime::enable(std::string& error) noexcept {
     }
 
     try {
-        const Vector2D pointer = g_pPointerManager->position();
+        const Vector2D pointer = pointerManager()->position();
         m_target = {pointer.x, pointer.y};
         reset(m_spring, m_target);
         m_lastStep = Clock::now();
@@ -143,11 +152,11 @@ bool Runtime::enable(std::string& error) noexcept {
         m_mouseListener = Event::bus()->m_events.input.mouse.move.listen([this](Vector2D position, Event::SCallbackInfo&) { onMouseMove(position); });
         m_mouseButtonListener = Event::bus()->m_events.input.mouse.button.listen(
             [this](IPointer::SButtonEvent event, Event::SCallbackInfo&) { onMouseButton(event); });
-        m_cursorListener = g_pPointerManager->m_events.cursorChanged.listen([this] { onCursorChanged(); });
+        m_cursorListener = pointerManager()->m_events.cursorChanged.listen([this] { onCursorChanged(); });
         m_monitorAddedListener = Event::bus()->m_events.monitor.added.listen([this](PHLMONITOR monitor) { onMonitorAdded(monitor); });
 
         m_enabled = true;
-        g_pPointerManager->lockSoftwareAll();
+        pointerManager()->lockSoftwareAll();
         m_softwareLocked = true;
         damageCurrentAndNative();
         return true;
@@ -177,14 +186,14 @@ void Runtime::disable() noexcept {
         damage(m_lastBounds);
 
     clearListeners();
-    if (m_softwareLocked && g_pPointerManager) {
-        g_pPointerManager->unlockSoftwareAll();
+    if (m_softwareLocked && pointerManager()) {
+        pointerManager()->unlockSoftwareAll();
         m_softwareLocked = false;
     }
     removeHook();
 
-    if (wasEnabled && g_pHyprRenderer && g_pPointerManager)
-        g_pHyprRenderer->damageBox(g_pPointerManager->getCursorBoxGlobal().expand(kDamagePadding));
+    if (wasEnabled && g_pHyprRenderer && pointerManager())
+        g_pHyprRenderer->damageBox(pointerManager()->getCursorBoxGlobal().expand(kDamagePadding));
 
     m_haveBounds = false;
     m_spring = {};
@@ -197,7 +206,7 @@ bool Runtime::enabled() const noexcept {
     return m_enabled;
 }
 
-void Runtime::hookCursorRender(CPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
+void Runtime::hookCursorRender(HyprPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
                                std::optional<Vector2D> overridePos, bool forceRender) {
     auto* runtime = s_instance;
     if (!runtime || !runtime->m_cursorHook)
@@ -214,7 +223,7 @@ void Runtime::hookCursorRender(CPointerManager* self, PHLMONITOR monitor, const 
     }
 }
 
-bool Runtime::renderCursor(CPointerManager* pointers, PHLMONITOR monitor, const Time::steady_tp& now, std::optional<Vector2D> overridePos,
+bool Runtime::renderCursor(HyprPointerManager* pointers, PHLMONITOR monitor, const Time::steady_tp& now, std::optional<Vector2D> overridePos,
                            bool forceRender) noexcept {
     if (!pointers || !monitor) {
         ++m_renderRejects;
@@ -254,6 +263,10 @@ bool Runtime::renderCursor(CPointerManager* pointers, PHLMONITOR monitor, const 
         return false;
     }
     m_target = {pointer.x, pointer.y};
+    if (monitorFromVector(pointer) == monitor)
+        ++m_ownerOutputHookCalls;
+    else
+        ++m_nonOwnerOutputHookCalls;
 
     bool advanced = false;
     if (now > m_lastStep) {
@@ -285,7 +298,7 @@ bool Runtime::renderCursor(CPointerManager* pointers, PHLMONITOR monitor, const 
             damage(joined(previous, transformedBounds, kDamagePadding));
             if (g_pHyprRenderer)
                 g_pHyprRenderer->damageBox(CBox{pointer.x, pointer.y, 1, 1}.expand(kDamagePadding));
-            g_pCompositor->scheduleFrameForMonitor(monitor);
+            scheduleMonitorFrame(monitor);
         }
     }
 
@@ -343,14 +356,14 @@ void Runtime::damage(Bounds bounds) noexcept {
 void Runtime::damageCurrentAndNative() noexcept {
     if (m_haveBounds)
         damage(m_lastBounds);
-    if (g_pHyprRenderer && g_pPointerManager)
-        g_pHyprRenderer->damageBox(g_pPointerManager->getCursorBoxGlobal().expand(kDamagePadding));
+    if (g_pHyprRenderer && pointerManager())
+        g_pHyprRenderer->damageBox(pointerManager()->getCursorBoxGlobal().expand(kDamagePadding));
 }
 
 OrientedBox Runtime::currentTransform() const noexcept {
-    if (!g_pPointerManager)
+    if (!pointerManager())
         return {};
-    const auto& image = g_pPointerManager->currentCursorImage();
+    const auto& image = pointerManager()->currentCursorImage();
     if (!std::isfinite(image.scale) || image.scale <= 0.F)
         return {};
     return anchorAtHotspot({image.size.x / image.scale, image.size.y / image.scale}, {image.hotspot.x, image.hotspot.y}, visualHotspot(), currentVisual());
@@ -392,7 +405,7 @@ void Runtime::updatePress(double dt) noexcept {
 }
 
 void Runtime::onMouseMove(Vector2D position) noexcept {
-    if (!m_enabled || !g_pPointerManager)
+    if (!m_enabled || !pointerManager())
         return;
     if (!std::isfinite(position.x) || !std::isfinite(position.y))
         return;
@@ -406,11 +419,7 @@ void Runtime::onMouseMove(Vector2D position) noexcept {
         damage(next);
     if (g_pHyprRenderer)
         g_pHyprRenderer->damageBox(CBox{position.x, position.y, 1, 1}.expand(kDamagePadding));
-    if (g_pCompositor) {
-        const auto owner = g_pCompositor->getMonitorFromVector(position);
-        if (owner)
-            g_pCompositor->scheduleFrameForMonitor(owner);
-    }
+    scheduleMonitorFrame(monitorFromVector(position));
 }
 
 void Runtime::onMouseButton(IPointer::SButtonEvent event) noexcept {
@@ -434,8 +443,8 @@ void Runtime::onCursorChanged() noexcept {
 }
 
 void Runtime::onMonitorAdded(PHLMONITOR monitor) noexcept {
-    if (m_enabled && m_softwareLocked && g_pPointerManager && monitor)
-        g_pPointerManager->lockSoftwareForMonitor(monitor);
+    if (m_enabled && m_softwareLocked && pointerManager() && monitor)
+        pointerManager()->lockSoftwareForMonitor(monitor);
 }
 
 std::string Runtime::command(eHyprCtlOutputFormat format, const std::string& request) {
@@ -453,7 +462,9 @@ std::string Runtime::command(eHyprCtlOutputFormat format, const std::string& req
 
     if (format == FORMAT_JSON)
         return std::string{"{\"enabled\":"} + (enabled() ? "true" : "false") + ",\"cursor_hook_calls\":" + std::to_string(m_cursorHookCalls) +
-            ",\"passes_queued\":" + std::to_string(m_passesQueued) + ",\"render_rejects\":" + std::to_string(m_renderRejects) +
+            ",\"owner_output_hook_calls\":" + std::to_string(m_ownerOutputHookCalls) + ",\"non_owner_output_hook_calls\":" +
+            std::to_string(m_nonOwnerOutputHookCalls) + ",\"passes_queued\":" + std::to_string(m_passesQueued) +
+            ",\"render_rejects\":" + std::to_string(m_renderRejects) +
             ",\"fallback_calls\":" + std::to_string(m_fallbackCalls) + ",\"missing_image\":" + std::to_string(m_missingImage) +
             ",\"empty_image\":" + std::to_string(m_emptyImage) +
             ",\"missing_texture\":" + std::to_string(m_missingTexture) + ",\"invalid_state\":" + std::to_string(m_invalidState) +
@@ -461,7 +472,8 @@ std::string Runtime::command(eHyprCtlOutputFormat format, const std::string& req
             ",\"invalid_pointer\":" + std::to_string(m_invalidPointer) + ",\"invalid_bounds\":" + std::to_string(m_invalidBounds) +
             ",\"target_x\":" + std::to_string(m_target.x) + ",\"target_y\":" + std::to_string(m_target.y) +
             ",\"body_x\":" + std::to_string(m_spring.body.x) + ",\"body_y\":" + std::to_string(m_spring.body.y) +
-            ",\"spring_settled\":" + (m_spring.settled ? "true" : "false") + "}\n";
+            ",\"spring_settled\":" + (m_spring.settled ? "true" : "false") + ",\"pressed_button_count\":" +
+            std::to_string(m_pressedButtonCount) + ",\"press_amount\":" + std::to_string(m_pressAmount) + "}\n";
     return std::string{"clothcursor: "} + (enabled() ? "enabled" : "disabled") + " (cursor hooks " + std::to_string(m_cursorHookCalls) + ", passes " +
         std::to_string(m_passesQueued) + ")\n";
 }

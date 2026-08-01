@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check shell syntax
-        run: bash -n install.sh scripts/clothcursorctl tests/installer_test.sh
+        run: bash -n install.sh scripts/clothcursorctl tests/installer_test.sh tests/nested_multi_output_test.sh
       - name: Configure portable physics core
         run: cmake -S . -B build-core -DCMAKE_BUILD_TYPE=Release -DCLOTH_CURSOR_BUILD_PLUGIN=OFF
       - name: Build
