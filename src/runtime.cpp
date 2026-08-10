@@ -20,8 +20,13 @@ namespace clothcursor {
 namespace {
 constexpr double kDamagePadding = 3.0;
 #if CLOTHCURSOR_NAMESPACED_POINTER_MANAGER
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+constexpr std::string_view kCursorRenderSymbol =
+    "_ZN7Pointer15CPointerManager24renderSoftwareCursorsForEN9Hyprutils6Memory14CSharedPointerIN7Monitor8CMonitorEEERKNSt6chrono10time_pointINS7_3_V212steady_clockENS7_8durationIlSt5ratioILl1ELl1000000000EEEEEERNS1_4Math7CRegionESt8optionalINSI_8Vector2DEEbb";
+#else
 constexpr std::string_view kCursorRenderSymbol =
     "_ZN7Pointer15CPointerManager24renderSoftwareCursorsForEN9Hyprutils6Memory14CSharedPointerIN7Monitor8CMonitorEEERKNSt6chrono10time_pointINS7_3_V212steady_clockENS7_8durationIlSt5ratioILl1ELl1000000000EEEEEERNS1_4Math7CRegionESt8optionalINSI_8Vector2DEEb";
+#endif
 #else
 constexpr std::string_view kCursorRenderSymbol =
     "_ZN15CPointerManager24renderSoftwareCursorsForEN9Hyprutils6Memory14CSharedPointerI8CMonitorEERKNSt6chrono10time_pointINS5_3_V212steady_clockENS5_8durationIlSt5ratioILl1ELl1000000000EEEEEERNS0_4Math7CRegionESt8optionalINSG_8Vector2DEEb";
@@ -207,19 +212,39 @@ bool Runtime::enabled() const noexcept {
 }
 
 void Runtime::hookCursorRender(HyprPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
-                               std::optional<Vector2D> overridePos, bool forceRender) {
+                               std::optional<Vector2D> overridePos,
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+                               bool screencopy,
+#endif
+                               bool forceRender) {
     auto* runtime = s_instance;
     if (!runtime || !runtime->m_cursorHook)
         return;
     const auto original = reinterpret_cast<CursorRenderFn>(runtime->m_cursorHook->m_original);
     if (!runtime->m_enabled) {
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+        original(self, monitor, now, damage, overridePos, screencopy, forceRender);
+#else
         original(self, monitor, now, damage, overridePos, forceRender);
+#endif
         return;
     }
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+    // Hyprland 0.56.2 added a dedicated screencopy path. Keep its monitor-local
+    // override and duplicate-suppression behavior entirely in the stock renderer.
+    if (screencopy) {
+        original(self, monitor, now, damage, overridePos, screencopy, forceRender);
+        return;
+    }
+#endif
     ++runtime->m_cursorHookCalls;
     if (!runtime->renderCursor(self, monitor, now, overridePos, forceRender)) {
         ++runtime->m_fallbackCalls;
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+        original(self, monitor, now, damage, overridePos, screencopy, forceRender);
+#else
         original(self, monitor, now, damage, overridePos, forceRender);
+#endif
     }
 }
 

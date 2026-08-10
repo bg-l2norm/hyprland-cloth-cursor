@@ -33,10 +33,18 @@ class Runtime {
 
   private:
     using Clock = std::chrono::steady_clock;
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+    using CursorRenderFn = void (*)(HyprPointerManager*, PHLMONITOR, const Time::steady_tp&, CRegion&, std::optional<Vector2D>, bool, bool);
+#else
     using CursorRenderFn = void (*)(HyprPointerManager*, PHLMONITOR, const Time::steady_tp&, CRegion&, std::optional<Vector2D>, bool);
+#endif
 
     static void hookCursorRender(HyprPointerManager* self, PHLMONITOR monitor, const Time::steady_tp& now, CRegion& damage,
-                                 std::optional<Vector2D> overridePos, bool forceRender);
+                                 std::optional<Vector2D> overridePos,
+#if CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY
+                                 bool screencopy,
+#endif
+                                 bool forceRender);
 
     bool installHook(std::string& error) noexcept;
     void removeHook() noexcept;

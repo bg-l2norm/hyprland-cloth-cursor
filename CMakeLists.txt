@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(hyprland-cloth-cursor VERSION 0.2.0 LANGUAGES CXX)
+project(hyprland-cloth-cursor VERSION 0.2.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,9 @@ if(CLOTH_CURSOR_BUILD_PLUGIN)
     add_library(clothcursor SHARED src/plugin.cpp src/runtime.cpp src/cursor_pass.cpp)
     target_link_libraries(clothcursor PRIVATE clothcursor_physics PkgConfig::HYPRLAND)
     target_compile_options(clothcursor PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-gnu-unique)
+    if(CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY)
+        target_compile_definitions(clothcursor PRIVATE CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY=1)
+    endif()
     set_target_properties(clothcursor PROPERTIES
         OUTPUT_NAME clothcursor
     )
