@@ -29,6 +29,27 @@ if(CLOTH_CURSOR_BUILD_PLUGIN)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland)
 
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES PkgConfig::HYPRLAND)
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    unset(CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY CACHE)
+    check_cxx_source_compiles([=[
+        #include <hyprland/src/pointer/PointerManager.hpp>
+        #include <optional>
+        #include <type_traits>
+
+        using CursorRenderWithScreencopy = void (Pointer::CPointerManager::*)(
+            PHLMONITOR, const Time::steady_tp&, CRegion&, std::optional<Vector2D>, bool, bool);
+
+        static_assert(std::is_same_v<
+            decltype(static_cast<CursorRenderWithScreencopy>(&Pointer::CPointerManager::renderSoftwareCursorsFor)),
+            CursorRenderWithScreencopy>);
+
+        int main() { return 0; }
+    ]=] CLOTH_CURSOR_CURSOR_RENDER_HAS_SCREENCOPY)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
+
     add_library(clothcursor SHARED src/plugin.cpp src/runtime.cpp src/cursor_pass.cpp)
     target_link_libraries(clothcursor PRIVATE clothcursor_physics PkgConfig::HYPRLAND)
     target_compile_options(clothcursor PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-gnu-unique)
