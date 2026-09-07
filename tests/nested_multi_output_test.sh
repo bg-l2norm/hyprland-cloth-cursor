@@ -35,7 +35,9 @@ if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -z "${WAYLAND_DISPLAY:-}" ]]; the
   export WAYLAND_DISPLAY="$(jq -r '.[0].wl_socket' <<<"$instances")"
 fi
 
-Hyprland -c "$CONFIG" >"${TMPDIR:-/tmp}/clothcursor-nested-test.log" 2>&1 &
+# Use Aquamarine's headless backend so parent pointer activity cannot perturb
+# deterministic movecursor positions in the nested compositor.
+AQ_BACKEND="${AQ_BACKEND:-headless}" Hyprland -c "$CONFIG" >"${TMPDIR:-/tmp}/clothcursor-nested-test.log" 2>&1 &
 CHILD_PID=$!
 for _ in {1..60}; do
   CHILD="$(hyprctl -j instances 2>/dev/null | jq -r --argjson pid "$CHILD_PID" '.[] | select(.pid == $pid) | .instance' || true)"
