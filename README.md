@@ -1,10 +1,10 @@
 # Hyprland Cloth Cursor
 
-A native C++ plugin for Hyprland that gives the visible cursor inertial drag, rotation, bend, stretch, and click compression.
+Native C++ Hyprland plugin that makes the visible cursor have inertial drag, rotation, bend, stretch, and click compression.
 
 https://github.com/user-attachments/assets/21f9e71b-1e15-45f2-aabc-06c6c4872f2d
 
-The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds a small Lua startup entry that loads and enables the plugin after login.
+The compiled plugin is `libclothcursor.so`. On end4 systems the installer adds a small Lua startup entry which loads and enables the plugin after login.
 
 > [!IMPORTANT]
 > This release is live-tested against these exact Hyprland builds:
@@ -16,20 +16,20 @@ The compiled plugin is `libclothcursor.so`. On end4 systems, the installer adds 
 > 0.56.2  efb50993780079460b0cbed1363e2166a2de1d9f_aq_0.15_hu_0.14_hg_0.5_hc_0.1_hlg_0.6
 > ```
 >
-> Hyprland plugins use private compositor APIs. Other versions are **untested**, but the installer can build against their installed headers after an explicit warning and confirmation. The plugin still refuses a build/runtime ABI mismatch, and it restores or retains the stock cursor if its guarded renderer-hook checks fail. The current renderer path is OpenGL.
+> Other versions are **untested** but the installer can build against their installed headers after an explicit warning and confirmation. The plugin still refuses a build/runtime ABI mismatch, and restores/keeps the stock cursor if its guarded renderer-hook checks fail. The renderer currently in use is OpenGL.
 
 ## What it does
 
-- Moves the visible cursor through a bounded two-dimensional spring.
-- Uses spring lag and velocity to calculate rotation, skew, and stretch.
-- Compresses the cursor to `79%` while a mouse button is held, then springs back.
+- Moves the visible cursor around a bounded 2D spring.
+- Computes rotation, skew and stretch from spring lag and velocity.
+- When a mouse button is held it compresses the cursor to `79%` and rebounds.
 - Transforms the cursor texture currently supplied by Hyprland, including theme and application cursor shapes.
 - Keeps application input at Hyprland's real pointer position.
 - Updates only the cursor's previous and current transformed regions.
 - Restores Hyprland's stock cursor when disabled.
 - Uses Hyprland's stock renderer for a frame when custom rendering cannot proceed safely.
-
-During fast motion, the visible cursor trails the pointer. Clicks still use the real pointer position.
+  
+The cursor visible follows the pointer in fast motion. Clicks still use the actual pointer position.
 
 ## How it works
 
